@@ -1,21 +1,25 @@
-/********************************************************************************
- * Copyright (C) 2021 Ericsson and others.
- *
- * This program and the accompanying materials are made available under the
- * terms of the Eclipse Public License v. 2.0 which is available at
- * http://www.eclipse.org/legal/epl-2.0.
- *
- * This Source Code may also be made available under the following Secondary
- * Licenses when the conditions for such availability set forth in the Eclipse
- * Public License v. 2.0 are satisfied: GNU General Public License, version 2
- * with the GNU Classpath Exception which is available at
- * https://www.gnu.org/software/classpath/license.html.
- *
- * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
- ********************************************************************************/
+// *****************************************************************************
+// Copyright (C) 2021 Ericsson and others.
+//
+// This program and the accompanying materials are made available under the
+// terms of the Eclipse Public License v. 2.0 which is available at
+// http://www.eclipse.org/legal/epl-2.0.
+//
+// This Source Code may also be made available under the following Secondary
+// Licenses when the conditions for such availability set forth in the Eclipse
+// Public License v. 2.0 are satisfied: GNU General Public License, version 2
+// with the GNU Classpath Exception which is available at
+// https://www.gnu.org/software/classpath/license.html.
+//
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
+// *****************************************************************************
 
-import { injectable } from '@theia/core/shared/inversify';
-import { PreferenceLeafNodeRenderer } from './preference-node-renderer';
+import { codiconArray } from '@theia/core/lib/browser';
+import { injectable, interfaces } from '@theia/core/shared/inversify';
+import { IJSONSchema } from '@theia/core/lib/common/json-schema';
+import { Preference } from '../../util/preference-types.js';
+import { PreferenceLeafNodeRenderer, PreferenceNodeRenderer } from './preference-node-renderer.js';
+import { PreferenceLeafNodeRendererContribution } from './preference-node-renderer-creator.js';
 
 @injectable()
 export class PreferenceArrayInputRenderer extends PreferenceLeafNodeRenderer<string[], HTMLInputElement> {
@@ -60,7 +64,7 @@ export class PreferenceArrayInputRenderer extends PreferenceLeafNodeRenderer<str
         iconWrapper.tabIndex = 0;
         existingValue.appendChild(iconWrapper);
         const icon = document.createElement('i');
-        icon.classList.add('preference-array-clear-item');
+        icon.classList.add(...codiconArray('close'));
         iconWrapper.appendChild(icon);
         return existingValue;
     }
@@ -79,22 +83,19 @@ export class PreferenceArrayInputRenderer extends PreferenceLeafNodeRenderer<str
         input.setAttribute('aria-label', 'Preference String Input');
         const iconWrapper = document.createElement('span');
         inputWrapper.appendChild(iconWrapper);
-        iconWrapper.classList.add('preference-array-element-btn', 'add-btn');
+        iconWrapper.classList.add('preference-array-element-btn', ...codiconArray('add'));
         iconWrapper.setAttribute('role', 'button');
         const handler = this.addItem.bind(this);
         iconWrapper.onclick = handler;
         iconWrapper.onkeydown = handler;
         iconWrapper.tabIndex = 0;
         iconWrapper.setAttribute('aria-label', 'Submit Preference Input');
-        const icon = document.createElement('i');
-        icon.classList.add('fa', 'fa-plus');
-        iconWrapper.appendChild(icon);
         return inputWrapper;
     }
 
     protected doHandleValueChange(): void {
         this.updateInspection();
-        const values = this.getValue();
+        const values = this.getValue() ?? this.getDefaultValue();
         const newValues = new Set(...values);
         for (const [value, row] of this.existingValues.entries()) {
             if (!newValues.has(value)) {
@@ -151,8 +152,23 @@ export class PreferenceArrayInputRenderer extends PreferenceLeafNodeRenderer<str
             .map(([value]) => value);
     }
 
-    dispose(): void {
+    override dispose(): void {
         this.existingValues.clear();
         super.dispose();
+    }
+}
+
+@injectable()
+export class PreferenceArrayInputRendererContribution extends PreferenceLeafNodeRendererContribution {
+    static ID = 'preference-array-input-renderer';
+    id = PreferenceArrayInputRendererContribution.ID;
+
+    canHandleLeafNode(node: Preference.LeafNode): number {
+        const type = Preference.LeafNode.getType(node);
+        return type === 'array' && (node.preference.data.items as IJSONSchema)?.type === 'string' ? 2 : 0;
+    }
+
+    createLeafNodeRenderer(container: interfaces.Container): PreferenceNodeRenderer {
+        return container.get(PreferenceArrayInputRenderer);
     }
 }
